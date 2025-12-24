@@ -1,7 +1,7 @@
-name: Build Android APK (Original Code)
+name: Build Android APK (Fix Licenses)
 
 on:
-  workflow_dispatch: # 这是一个手动触发的开关，避免每次提交都构建
+  workflow_dispatch:
 
 jobs:
   build-apk:
@@ -10,30 +10,40 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 设置 Python 环境
+      # 1. 设置 Java 环境 (Android 构建必须)
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # 2. 【关键新增步骤】强制同意 Android SDK 协议
+      # 这行命令相当于自动按下 "Yes" 键，解决 "Licenses not accepted" 报错
+      - name: Accept Android Licenses
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+
+      # 3. 设置 Python
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11' # 使用较新的 Python 尝试获得更好的库支持
+          python-version: '3.11'
 
-      # 安装打包工具
-      - name: Install Build Tools
+      # 4. 安装 Flet 和依赖
+      - name: Install Dependencies
         run: |
-          pip install flet
-          # 安装 cookiecutter，这是 flet build 内部需要的工具
-          pip install cookiecutter
+          pip install flet cookiecutter
 
-      # 开始打包
+      # 5. 打包 APK
+      # Flet 会自动读取 requirements.txt 安装库
       - name: Build APK
         run: |
-          # --include-packages 强制包含所有依赖
-          # 注意：这一步会尝试拉取 scikit-learn 的二进制包
           flet build apk --verbose --project "BioScanner Pro" --org "com.bioscanner.app"
 
-      # 上传结果
+      # 6. 上传结果
       - name: Upload APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: BioScanner-Original-APK
+          name: BioScanner-Android-APK
           path: build/apk/release.apk
