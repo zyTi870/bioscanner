@@ -36,9 +36,12 @@ jobs:
 
       # 5. 打包 APK
       # Flet 会自动读取 requirements.txt 安装库
-      - name: Build APK
-        run: |
-          flet build apk --verbose --project "BioScanner Pro" --org "com.bioscanner.app"
+      - name: Upload APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: BioScanner-Android-APK
+          path: build/apk/   <-- 修正：上传整个文件夹，肯定能抓到
 
       # 6. 上传结果
       - name: Upload APK
