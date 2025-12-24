@@ -1,46 +1,39 @@
-name: Build Android APK
+name: Build Android APK (Original Code)
 
 on:
-  workflow_dispatch:  # 仅支持手动触发，节省资源
+  workflow_dispatch: # 这是一个手动触发的开关，避免每次提交都构建
 
 jobs:
-  build-android:
+  build-apk:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Java (JDK 17)
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
+      # 设置 Python 环境
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11' # 使用较新的 Python 尝试获得更好的库支持
 
-      - name: Install Dependencies
+      # 安装打包工具
+      - name: Install Build Tools
         run: |
           pip install flet
-          # 安装我们专门为安卓准备的依赖
-          pip install -r requirements_android.txt
+          # 安装 cookiecutter，这是 flet build 内部需要的工具
+          pip install cookiecutter
 
-      - name: Setup Flutter & Android SDK
-        # Flet build 命令会自动下载需要的 SDK，但我们需要预先设置环境以避免权限问题
-        run: |
-          git config --global --add safe.directory '*'
-
+      # 开始打包
       - name: Build APK
         run: |
-          # --verbose 显示详细日志，方便排错
-          # 这步时间会比较长（10-20分钟），因为要下载大量 Android 工具链
-          flet build apk --verbose --project "BioScanner Pro" --org "com.bioscanner.app"
+          # --include-packages 强制包含所有依赖
+          # 注意：这一步会尝试拉取 scikit-learn 的二进制包
+          flet build apk --verbose --project "BioScanner Pro" --org "com.bioscanner.app" --include-packages flet,numpy,pandas,opencv-python,scikit-learn
 
+      # 上传结果
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: BioScanner-Android-APK
+          name: BioScanner-Original-APK
           path: build/apk/release.apk
-          retention-days: 5
