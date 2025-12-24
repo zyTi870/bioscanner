@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from sklearn.linear_model import LinearRegression
+# from sklearn.linear_model import LinearRegression # <--- 移除不兼容的库
 
 class AnalysisEngine:
     def __init__(self):
@@ -41,9 +41,20 @@ class AnalysisEngine:
         return np.mean(roi) if roi.size > 0 else 0
 
     def fit_curve(self, h_vals, concs):
-        """线性拟合标准曲线"""
-        X = np.array(h_vals).reshape(-1, 1)
+        """线性拟合标准曲线 (Numpy版 - 结果与sklearn完全一致)"""
+        X = np.array(h_vals)
         Y = np.array(concs)
-        model = LinearRegression().fit(X, Y)
-        self.k, self.b = model.coef_[0], model.intercept_
-        return self.k, self.b, model.score(X, Y)
+        
+        # 核心替换：使用 polyfit(deg=1) 进行线性回归 y = kx + b
+        # 这一步数学上等同于 LinearRegression().fit()
+        k, b = np.polyfit(X, Y, 1)
+        self.k, self.b = k, b
+        
+        # 兼容性计算：手动计算 R2 (因为移除了 sklearn.score)
+        predict_y = k * X + b
+        mean_y = np.mean(Y)
+        ss_res = np.sum((Y - predict_y) ** 2)
+        ss_tot = np.sum((Y - mean_y) ** 2)
+        r2 = 1 - (ss_res / ss_tot)
+        
+        return self.k, self.b, r2
