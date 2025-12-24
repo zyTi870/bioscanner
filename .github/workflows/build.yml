@@ -41,7 +41,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: BioScanner-Android-APK
-          path: build/apk/   <-- 修正：上传整个文件夹，肯定能抓到
+          path: build/
 
       # 6. 上传结果
       - name: Upload APK
