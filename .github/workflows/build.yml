@@ -28,7 +28,7 @@ jobs:
         run: |
           # --include-packages 强制包含所有依赖
           # 注意：这一步会尝试拉取 scikit-learn 的二进制包
-          flet build apk --verbose --project "BioScanner Pro" --org "com.bioscanner.app" --include-packages flet,numpy,pandas,opencv-python,scikit-learn
+          flet build apk --verbose --project "BioScanner Pro" --org "com.bioscanner.app"
 
       # 上传结果
       - name: Upload APK
