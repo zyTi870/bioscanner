@@ -1,0 +1,6 @@
+flet>=0.21.0
+opencv-python-headless
+numpy
+scikit-learn
+pandas
+pyinstaller
