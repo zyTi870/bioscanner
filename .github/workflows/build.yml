@@ -1,4 +1,4 @@
-name: Build Android APK (Optimized)
+name: Build Android APK (Unlock Versions)
 
 on:
   workflow_dispatch:
@@ -24,8 +24,7 @@ jobs:
           channel: stable
           cache: true
 
-      # 3. 【关键修复】显式接受 Android 协议
-      # 这能解决 Doctor summary 里的警告
+      # 3. 同意 Android 协议
       - name: Accept Android Licenses
         run: |
           yes | flutter doctor --android-licenses
@@ -36,27 +35,27 @@ jobs:
         with:
           python-version: '3.11'
 
-      # 5. 【核心修复】重新生成精简版 requirements.txt
-      # 1. 去掉 pandas (您的代码未引用，且它会导致编译失败)
-      # 2. 限制 numpy < 2.0 (新版 numpy 2.x 会导致兼容性问题)
-      # 3. 锁定 opencv-python-headless 版本
-      - name: Generate optimized requirements.txt
+      # 5. 【核心修复】生成 requirements.txt
+      # 1. 移除 opencv 的版本号 (==4.10.0.84)，让 pip 自动寻找可用版本
+      # 2. 保留 numpy<2.0.0 (防止新版 numpy 导致崩溃)
+      # 3. 移除 pandas (不支持安卓)
+      - name: Generate compatible requirements.txt
         run: |
           echo "flet" > requirements.txt
           echo "numpy<2.0.0" >> requirements.txt
-          echo "opencv-python-headless==4.10.0.84" >> requirements.txt
+          echo "opencv-python-headless" >> requirements.txt
           
           echo "--- Content of requirements.txt ---"
           cat requirements.txt
 
-      # 6. 安装依赖
-      - name: Install Dependencies
+      # 6. 安装依赖 (仅安装构建工具)
+      # 注意：这里只安装 cookiecutter，requirements.txt 留给 flet build 处理
+      - name: Install Build Tools
         run: |
           pip install cookiecutter
-          pip install -r requirements.txt
 
       # 7. 打包 APK
-      # 增加 --verbose 以便出错时看详细日志
+      # Flet 会自动读取上面的 requirements.txt 并尝试寻找匹配的安卓包
       - name: Build APK
         run: |
           flet build apk --verbose \
