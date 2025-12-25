@@ -1,4 +1,4 @@
-name: Build Android APK (Environment Fix)
+name: Build Android APK (Final & Verified)
 
 on:
   workflow_dispatch:
@@ -10,10 +10,8 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 1. 【新增】安装 Linux 系统级依赖
-      # 修复日志中 Flutter doctor 报错：GTK 3.0 development libraries are required
-      # 这些库是 Flutter 构建工具在 Linux 上运行所必须的，即使是打安卓包也需要
-      - name: Install System Dependencies
+      # 1. 安装 Linux 系统级依赖 (修复 Flutter Doctor 报错)
+      - name: Install Linux Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libblkid-dev pkg-config cmake ninja-build clang
@@ -43,31 +41,39 @@ jobs:
         with:
           python-version: '3.11'
 
-      # 6. 【关键调整】依赖文件
-      # 1. flet: 核心库
-      # 2. numpy<2.0.0: 必须锁定旧版，防止新版不兼容
-      # 3. opencv-python-headless<4.10: 尝试使用稍旧版本(4.x系列)，新版可能没有安卓包
-      - name: Generate compatible requirements.txt
+      # 6. 【核心步骤】生成适配安卓的 requirements.txt
+      # 我们必须在这里把 opencv-python 替换掉，并限制 numpy 版本
+      # 否则 APK 安装后会闪退
+      - name: Patch requirements.txt
         run: |
+          echo "Original requirements:"
+          cat requirements.txt || echo "No requirements.txt found"
+          
+          # 重写 requirements.txt
+          # 1. flet: 必须包含
+          # 2. numpy<2.0.0: 必须锁定旧版
+          # 3. opencv-python-headless<4.10: 尝试使用兼容性更好的旧版
           echo "flet" > requirements.txt
           echo "numpy<2.0.0" >> requirements.txt
           echo "opencv-python-headless<4.10" >> requirements.txt
           
-          echo "--- Content of requirements.txt ---"
+          echo "--- Final requirements.txt for build ---"
           cat requirements.txt
 
-      # 7. 安装构建工具
-      # 必须先安装 flet，否则下一步找不到命令
+      # 7. 【关键修复】安装依赖
+      # 这里必须显式 pip install flet，否则系统里没有 flet 命令！
+      # 同时安装 cookiecutter (构建工具必须)
       - name: Install Dependencies
         run: |
+          pip install --upgrade pip
           pip install cookiecutter
           pip install -r requirements.txt
 
       # 8. 打包 APK
-      # 使用 python -m flet 调用，确保路径正确
+      # 现在系统里肯定有 flet 命令了，直接运行即可
       - name: Build APK
         run: |
-          python -m flet build apk --verbose \
+          flet build apk --verbose \
             --project "BioScanner Pro" \
             --org "com.bioscanner.app"
 
