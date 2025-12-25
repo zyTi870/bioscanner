@@ -1,4 +1,4 @@
-name: Build Android APK (Golden Legacy)
+name: Build Android APK (Modern Fix)
 
 on:
   workflow_dispatch:
@@ -10,7 +10,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 1. 安装 Linux 系统依赖 (保持这个，这步是成功的关键)
+      # 1. 安装 Linux 依赖 (这是基础，保持不动)
       - name: Install System Dependencies
         run: |
           sudo apt-get update
@@ -35,26 +35,29 @@ jobs:
         run: |
           yes | flutter doctor --android-licenses
 
-      # 5. 【核心修改】降级 Python 到 3.9
-      # Python 3.9 拥有最广泛的 Android 预编译包支持
-      # 这能极大降低 "No matching distribution" 的风险
+      # 5. 【关键回调】设置 Python 3.11
+      # 必须使用 3.11，因为 Flet 打包进 APK 的内部 Python 版本就是 3.11
+      # 保持版本一致能极大减少 pip 找不到包的概率
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.9'
+          python-version: '3.11'
 
-      # 6. 【核心修改】锁定“黄金版本”依赖
-      # 使用经过社区长期验证兼容 Android 的特定旧版本
-      - name: Create requirements.txt
+      # 6. 【核心修复】依赖配置
+      # 1. numpy<2.0.0: 必须限制，防止 Numpy 2.0 导致 APP 闪退
+      # 2. opencv-python-headless: **不锁版本**。让 pip 自动找适配 Py3.11 的最佳版本
+      # 3. 升级 pip: 确保能识别最新的 manylinux/android wheel 标签
+      - name: Prepare Requirements
         run: |
           echo "flet" > requirements.txt
-          echo "numpy==1.23.5" >> requirements.txt
-          echo "opencv-python-headless==4.5.5.64" >> requirements.txt
+          echo "numpy<2.0.0" >> requirements.txt
+          echo "opencv-python-headless" >> requirements.txt
           
           echo "--- Content of requirements.txt ---"
           cat requirements.txt
 
       # 7. 安装依赖
+      # 先升级 pip，再安装 flet 和 cookiecutter
       - name: Install Dependencies
         run: |
           pip install --upgrade pip
@@ -62,7 +65,7 @@ jobs:
           pip install -r requirements.txt
 
       # 8. 打包 APK
-      # 使用 -vv 参数以防万一还需要调试
+      # 使用 -vv 仍然很有必要，万一出错能看清是哪个包下的手
       - name: Build APK
         run: |
           flet build apk -vv \
