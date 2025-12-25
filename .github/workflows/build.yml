@@ -1,4 +1,4 @@
-name: Build Android APK (Final & Verified)
+name: Build Android APK (Python 3.10 Compatibility)
 
 on:
   workflow_dispatch:
@@ -10,8 +10,8 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 1. 安装 Linux 系统级依赖 (修复 Flutter Doctor 报错)
-      - name: Install Linux Dependencies
+      # 1. 安装 Linux 系统级依赖 (保持这个，它解决了 Doctor 报错)
+      - name: Install System Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libblkid-dev pkg-config cmake ninja-build clang
@@ -23,7 +23,7 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      # 3. 设置 Flutter (Stable Channel)
+      # 3. 设置 Flutter (Stable)
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -35,34 +35,29 @@ jobs:
         run: |
           yes | flutter doctor --android-licenses
 
-      # 5. 设置 Python
+      # 5. 【核心修改】降级 Python 到 3.10
+      # Android 交叉编译生态对 Python 3.10 的支持比 3.11 更完善
+      # 这能解决 "No matching distribution" 或编译失败的问题
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.10'
 
-      # 6. 【核心步骤】生成适配安卓的 requirements.txt
-      # 我们必须在这里把 opencv-python 替换掉，并限制 numpy 版本
-      # 否则 APK 安装后会闪退
-      - name: Patch requirements.txt
+      # 6. 【核心修改】优化依赖文件
+      # 1. flet
+      # 2. numpy==1.26.4: 锁定在 1.x 版本，这是最稳的版本
+      # 3. opencv-python-headless: 不锁版本，让 pip 在 Python 3.10 环境下自己找最合适的
+      - name: Prepare requirements.txt
         run: |
-          echo "Original requirements:"
-          cat requirements.txt || echo "No requirements.txt found"
-          
-          # 重写 requirements.txt
-          # 1. flet: 必须包含
-          # 2. numpy<2.0.0: 必须锁定旧版
-          # 3. opencv-python-headless<4.10: 尝试使用兼容性更好的旧版
           echo "flet" > requirements.txt
-          echo "numpy<2.0.0" >> requirements.txt
-          echo "opencv-python-headless<4.10" >> requirements.txt
+          echo "numpy==1.26.4" >> requirements.txt
+          echo "opencv-python-headless" >> requirements.txt
           
-          echo "--- Final requirements.txt for build ---"
+          echo "--- requirements.txt content ---"
           cat requirements.txt
 
-      # 7. 【关键修复】安装依赖
-      # 这里必须显式 pip install flet，否则系统里没有 flet 命令！
-      # 同时安装 cookiecutter (构建工具必须)
+      # 7. 安装依赖
+      # 先安装 flet 库，确保有命令可用
       - name: Install Dependencies
         run: |
           pip install --upgrade pip
@@ -70,10 +65,10 @@ jobs:
           pip install -r requirements.txt
 
       # 8. 打包 APK
-      # 现在系统里肯定有 flet 命令了，直接运行即可
+      # 增加 -vv 参数，如果出错，能看到到底是缺了哪个 C 文件
       - name: Build APK
         run: |
-          flet build apk --verbose \
+          flet build apk -vv \
             --project "BioScanner Pro" \
             --org "com.bioscanner.app"
 
