@@ -1,4 +1,4 @@
-name: Build Android APK (Path Fix)
+name: Build Android APK (Final Fix)
 
 on:
   workflow_dispatch:
@@ -10,67 +10,48 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 1. 设置 Java 17
+      # 1. 设置 Java 环境
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      # 2. 设置 Flutter (最新稳定版)
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-
-      # 3. 同意 Android 协议
+      # 2. 同意 Android 协议
       - name: Accept Android Licenses
         run: |
-          yes | flutter doctor --android-licenses
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
 
-      # 4. 设置 Python
+      # 3. 设置 Python
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      # 5. 生成依赖文件
-      # 注意：必须包含 flet
-      - name: Generate compatible requirements.txt
-        run: |
-          echo "flet" > requirements.txt
-          echo "numpy<2.0.0" >> requirements.txt
-          echo "opencv-python-headless" >> requirements.txt
-          
-          echo "--- Content of requirements.txt ---"
-          cat requirements.txt
-
-      # 6. 安装依赖
-      # 同时安装 cookiecutter (构建工具) 和 requirements.txt
+      # 4. 安装依赖
+      # 注意：这里去掉了 scikit-learn，保留了 numpy/opencv/pandas
       - name: Install Dependencies
         run: |
-          pip install cookiecutter
-          pip install -r requirements.txt
+          pip install flet cookiecutter
+          pip install numpy pandas opencv-python
 
-      # 7. 【核心修复】打包 APK
-      # 使用 'python -m flet' 代替直接用 'flet'
-      # 这样可以100%确保调用的是当前Python环境安装的flet库
+      # 5. 打包 APK
       - name: Build APK
         run: |
-          python -m flet build apk --verbose \
-            --project "BioScanner Pro" \
-            --org "com.bioscanner.app"
+          flet build apk --verbose --project "BioScanner" --org "com.bioscanner.app"
 
-      # 8. 调试输出
-      - name: List Output Files
+      # 6. 【调试步骤】列出所有文件
+      # 这一步会帮我们确认 build 文件夹到底有没有生成
+      - name: List All Files (Debug)
         run: |
-          ls -R build/apk || echo "Build folder not found"
+          echo "Listing current directory structure:"
+          ls -R
 
-      # 9. 上传 APK
+      # 7. 上传 APK (使用全盘搜索模式)
+      # **/*.apk 表示：查找所有子文件夹中的 .apk 文件
       - name: Upload APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: BioScanner-Android-APK
-          path: build/apk/**/*.apk
+          path: "**/*.apk"
