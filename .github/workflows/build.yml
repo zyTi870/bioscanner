@@ -1,4 +1,4 @@
-name: Build Android APK (Final Fix)
+name: Build Android APK (Fixed EOF)
 
 on:
   workflow_dispatch:
@@ -10,17 +10,21 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 1. 设置 Java 环境
+      # 1. 设置 Java 17 (Flet 打包依赖)
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      # 2. 同意 Android 协议
-      - name: Accept Android Licenses
-        run: |
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+      # 2. 【关键修复】手动安装 Flutter
+      # 加上这一步，Flet 就检测到环境里有 Flutter，不会再弹窗问你 "Proceed? [y/n]"
+      # 从而彻底解决 EOFError
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.19.0' # 指定稳定版本
 
       # 3. 设置 Python
       - name: Setup Python
@@ -29,26 +33,28 @@ jobs:
           python-version: '3.11'
 
       # 4. 安装依赖
-      # 注意：这里去掉了 scikit-learn，保留了 numpy/opencv/pandas
+      # 注意：必须使用 headless 版 OpenCV 防止安卓闪退
       - name: Install Dependencies
         run: |
           pip install flet cookiecutter
-          pip install numpy pandas opencv-python
+          pip install numpy pandas opencv-python-headless
 
       # 5. 打包 APK
+      # Flet 会自动检测到上面安装好的 Flutter，直接开始编译
       - name: Build APK
         run: |
-          flet build apk --verbose --project "BioScanner Pro" --org "com.bioscanner.app"
+          flet build apk --verbose \
+            --project "BioScanner Pro" \
+            --org "com.bioscanner.app" \
+            --include-packages numpy,pandas,opencv-python-headless
 
-      # 6. 【调试步骤】列出所有文件
-      # 这一步会帮我们确认 build 文件夹到底有没有生成
-      - name: List All Files (Debug)
+      # 6. 调试：确认文件生成
+      - name: List Files (Debug)
         run: |
-          echo "Listing current directory structure:"
-          ls -R
+          echo "Listing build output:"
+          ls -R build/apk || echo "Build folder not found"
 
-      # 7. 上传 APK (使用全盘搜索模式)
-      # **/*.apk 表示：查找所有子文件夹中的 .apk 文件
+      # 7. 上传
       - name: Upload APK
         if: success()
         uses: actions/upload-artifact@v4
