@@ -1,4 +1,4 @@
-name: Build Android APK (Python 3.10 Compatibility)
+name: Build Android APK (Golden Legacy)
 
 on:
   workflow_dispatch:
@@ -10,7 +10,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 1. 安装 Linux 系统级依赖 (保持这个，它解决了 Doctor 报错)
+      # 1. 安装 Linux 系统依赖 (保持这个，这步是成功的关键)
       - name: Install System Dependencies
         run: |
           sudo apt-get update
@@ -35,29 +35,26 @@ jobs:
         run: |
           yes | flutter doctor --android-licenses
 
-      # 5. 【核心修改】降级 Python 到 3.10
-      # Android 交叉编译生态对 Python 3.10 的支持比 3.11 更完善
-      # 这能解决 "No matching distribution" 或编译失败的问题
+      # 5. 【核心修改】降级 Python 到 3.9
+      # Python 3.9 拥有最广泛的 Android 预编译包支持
+      # 这能极大降低 "No matching distribution" 的风险
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.9'
 
-      # 6. 【核心修改】优化依赖文件
-      # 1. flet
-      # 2. numpy==1.26.4: 锁定在 1.x 版本，这是最稳的版本
-      # 3. opencv-python-headless: 不锁版本，让 pip 在 Python 3.10 环境下自己找最合适的
-      - name: Prepare requirements.txt
+      # 6. 【核心修改】锁定“黄金版本”依赖
+      # 使用经过社区长期验证兼容 Android 的特定旧版本
+      - name: Create requirements.txt
         run: |
           echo "flet" > requirements.txt
-          echo "numpy==1.26.4" >> requirements.txt
-          echo "opencv-python-headless" >> requirements.txt
+          echo "numpy==1.23.5" >> requirements.txt
+          echo "opencv-python-headless==4.5.5.64" >> requirements.txt
           
-          echo "--- requirements.txt content ---"
+          echo "--- Content of requirements.txt ---"
           cat requirements.txt
 
       # 7. 安装依赖
-      # 先安装 flet 库，确保有命令可用
       - name: Install Dependencies
         run: |
           pip install --upgrade pip
@@ -65,7 +62,7 @@ jobs:
           pip install -r requirements.txt
 
       # 8. 打包 APK
-      # 增加 -vv 参数，如果出错，能看到到底是缺了哪个 C 文件
+      # 使用 -vv 参数以防万一还需要调试
       - name: Build APK
         run: |
           flet build apk -vv \
