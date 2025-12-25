@@ -1,4 +1,4 @@
-name: Build Android APK (Unlock Versions)
+name: Build Android APK (Path Fix)
 
 on:
   workflow_dispatch:
@@ -35,10 +35,8 @@ jobs:
         with:
           python-version: '3.11'
 
-      # 5. 【核心修复】生成 requirements.txt
-      # 1. 移除 opencv 的版本号 (==4.10.0.84)，让 pip 自动寻找可用版本
-      # 2. 保留 numpy<2.0.0 (防止新版 numpy 导致崩溃)
-      # 3. 移除 pandas (不支持安卓)
+      # 5. 生成依赖文件
+      # 注意：必须包含 flet
       - name: Generate compatible requirements.txt
         run: |
           echo "flet" > requirements.txt
@@ -48,17 +46,19 @@ jobs:
           echo "--- Content of requirements.txt ---"
           cat requirements.txt
 
-      # 6. 安装依赖 (仅安装构建工具)
-      # 注意：这里只安装 cookiecutter，requirements.txt 留给 flet build 处理
-      - name: Install Build Tools
+      # 6. 安装依赖
+      # 同时安装 cookiecutter (构建工具) 和 requirements.txt
+      - name: Install Dependencies
         run: |
           pip install cookiecutter
+          pip install -r requirements.txt
 
-      # 7. 打包 APK
-      # Flet 会自动读取上面的 requirements.txt 并尝试寻找匹配的安卓包
+      # 7. 【核心修复】打包 APK
+      # 使用 'python -m flet' 代替直接用 'flet'
+      # 这样可以100%确保调用的是当前Python环境安装的flet库
       - name: Build APK
         run: |
-          flet build apk --verbose \
+          python -m flet build apk --verbose \
             --project "BioScanner Pro" \
             --org "com.bioscanner.app"
 
