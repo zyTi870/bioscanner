@@ -1,4 +1,4 @@
-name: Build Android APK (Final Corrected)
+name: Build Android APK (Environment Fix)
 
 on:
   workflow_dispatch:
@@ -10,67 +10,73 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 1. 设置 Java 17
+      # 1. 【新增】安装 Linux 系统级依赖
+      # 修复日志中 Flutter doctor 报错：GTK 3.0 development libraries are required
+      # 这些库是 Flutter 构建工具在 Linux 上运行所必须的，即使是打安卓包也需要
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libblkid-dev pkg-config cmake ninja-build clang
+
+      # 2. 设置 Java 17
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      # 2. 设置 Flutter (最新稳定版，防止 EOFError)
+      # 3. 设置 Flutter (Stable Channel)
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
 
-      # 3. 同意 Android 协议
+      # 4. 同意 Android 协议
       - name: Accept Android Licenses
         run: |
           yes | flutter doctor --android-licenses
 
-      # 4. 设置 Python
+      # 5. 设置 Python
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      # 5. 【核心修复】生成 requirements.txt
-      # 1. 移除 opencv 版本锁定，避免找不到包
-      # 2. 必须包含 flet，否则下一步安装不上
-      # 3. numpy < 2.0 防止闪退
+      # 6. 【关键调整】依赖文件
+      # 1. flet: 核心库
+      # 2. numpy<2.0.0: 必须锁定旧版，防止新版不兼容
+      # 3. opencv-python-headless<4.10: 尝试使用稍旧版本(4.x系列)，新版可能没有安卓包
       - name: Generate compatible requirements.txt
         run: |
           echo "flet" > requirements.txt
           echo "numpy<2.0.0" >> requirements.txt
-          echo "opencv-python-headless" >> requirements.txt
+          echo "opencv-python-headless<4.10" >> requirements.txt
           
           echo "--- Content of requirements.txt ---"
           cat requirements.txt
 
-      # 6. 【关键修复】安装依赖
-      # 上次报错是因为这里漏了安装 requirements.txt
-      # 必须先安装 requirements.txt，系统里才会有 'flet' 这个命令！
+      # 7. 安装构建工具
+      # 必须先安装 flet，否则下一步找不到命令
       - name: Install Dependencies
         run: |
           pip install cookiecutter
           pip install -r requirements.txt
 
-      # 7. 打包 APK
-      # 这里的命令改回标准的 'flet build'
-      # 因为第6步已经安装了 flet，所以这里一定能找到命令
+      # 8. 打包 APK
+      # 使用 python -m flet 调用，确保路径正确
       - name: Build APK
         run: |
-          flet build apk --verbose \
+          python -m flet build apk --verbose \
             --project "BioScanner Pro" \
             --org "com.bioscanner.app"
 
-      # 8. 调试输出
+      # 9. 调试输出
       - name: List Output Files
         run: |
           ls -R build/apk || echo "Build folder not found"
 
-      # 9. 上传 APK
+      # 10. 上传 APK
       - name: Upload APK
         if: success()
         uses: actions/upload-artifact@v4
