@@ -1,4 +1,4 @@
 flet>=0.21.0
 opencv-python
 numpy
-pandas
+
